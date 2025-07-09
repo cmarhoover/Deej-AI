@@ -1,4 +1,4 @@
-dash
+dash==3.1.1
 tqdm
 mutagen
 Flask~=1.0
@@ -6,7 +6,7 @@ spotipy
 librosa
 dash_core_components==0.47.0
 dash_html_components==0.16.0
-dash_daq==0.1.4
+dash_daq==0.6.0
 pandas
 numpy
 dash_html_components
