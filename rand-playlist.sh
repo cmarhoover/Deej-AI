@@ -399,8 +399,7 @@ _generate_playlists() {
 
     # Set the playlist filename
     __relative_file=$(printf "${__random_file}" | sed "s|^${_ROOT_DIR}/||")
-    __playlist=$(printf "${__relative_file}" | cut -d'/' -f1 | sed 's/ /_/g')
-    __playlist=$(printf "${__playlist}"-"${_PLAYLIST_SUB}"".m3u")
+	__playlist=$(printf "%s-%s-%s.m3u" "$(date +%F)" "$(printf "${__relative_file}" | cut -d'/' -f1 | sed 's/ /_/g')" "$(basename "${__random_file}" .mp3)")
 
     # Prepare your variables for Deej-AI
     if [[ "${_PLAYLIST_DIR}" != */ ]]; then
