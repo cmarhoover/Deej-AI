@@ -4,8 +4,8 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import dash
 from dash.dependencies import Input, Output, State
 import dash_daq as daq
-import dash_core_components as dcc
-import dash_html_components as html
+from dash import dcc
+from dash import html
 from flask import send_from_directory
 from io import BytesIO
 from mutagen.mp3 import MP3
@@ -504,7 +504,7 @@ if __name__ == '__main__':
     mp3tovec = pickle.load(open(dump_directory + '/mp3tovecs/' + mp3tovec_file + '.p', 'rb'))
     print(f'{len(mp3tovec)} MP3s')
     if playlist_outfile == None:
-        app.run_server(threaded=False, debug=False)
+        app.run(threaded=False, debug=False)
     else:
         if input_song != None:
             if n_songs == None:
