@@ -17,7 +17,7 @@
 #   Deej-AI     https://github.com/teticio/Deej-AI
 #
 # Copyleft (c) 2024 alfred_j_kwack
-# version: 1.0.1
+# version: 1.0.2
 
 ###############################################################################
 # Strict Mode
@@ -35,7 +35,7 @@ IFS=$'\n\t'
 # Environment
 ###############################################################################
 
-# This program's basename.
+# This programs basename.
 _ME="$(basename "${0}")"
 
 ###############################################################################
@@ -120,7 +120,7 @@ _print_help() {
 
  _____           _              ____     __    _____ _         _ _     _
 | __  |___ ___ _| |___ _____   |    \ __|  |  |  _  | |___ _ _| |_|___| |_
-|    -| .'|   | . | . |     |  |  |  |  |  |  |   __| | .'| | | | |_ -|  _|
+|    -| . |   | . | . |     |  |  |  |  |  |  |   __| | . | | | | |_ -|  _|
 |__|__|__,|_|_|___|___|_|_|_|  |____/|_____|  |__|  |_|__,|_  |_|_|___|_|
                                                           |___|
 
@@ -132,15 +132,16 @@ Usage:
   ${_ME} -h | --help
 
 Options:
-  -h --help             Display this help information.
-  -r --root-directory   Directory to search for tracks. [ Required ]
-  -p --playlist-count   Number of playlists to create.  [ Default = 1 ]
-  -e --file-extension   File extenstion to match for.   [ Default = ".mp3" ]
-  -s --playlist-length  Number of tracks in playlist.   [ Default = 40 ]
-  -l --lookback         Deej-A.I lookback option.       [ Default = 3 ]
-  -n --noise            Deej-A.I noise option.          [ Default = 0 ]
-  -p --pickles          Deej-A.I pickles option.        [ Default = "Pickles" ]
-  -m --mp3tovec         Deej-A.I mp3tovec option.       [ Default = "mp3tovec" ]
+  -h --help               Display this help information.
+  -r --root-directory     Directory to search for tracks.   [ Required ]
+  -d --playlist-directory Directory to save the playlists.  [ Default = <root_directory> ]
+  -p --playlist-count     Number of playlists to create.    [ Default = 1 ]
+  -e --file-extension     File extenstion to match for.     [ Default = ".mp3" ]
+  -s --playlist-length    Number of tracks in playlist.     [ Default = 200 ]
+  -l --lookback           Deej-A.I lookback option.         [ Default = 3 ]
+  -n --noise              Deej-A.I noise option.            [ Default = 1 ]
+  -p --pickles            Deej-A.I pickles option.          [ Default = "Pickles" ]
+  -m --mp3tovec           Deej-A.I mp3tovec option.         [ Default = "mp3tovec" ]
 
 Example:
   ${_ME} -r "./some path/to music" -p 10 --file-extension ".flac"
@@ -167,11 +168,12 @@ _USE_DEBUG=0
 
 # Initialize additional expected option variables.
 _ROOT_DIR=
+_PLAYLIST_DIR=
 _PLAYLISTS_COUNT=1
 _FILE_EXT=".mp3"
 _LOOKBACK=3
-_SONGS=40
-_NOISE=0
+_SONGS=200
+_NOISE=1
 _PICKLES="Pickles"
 _MP3TOVEC="mp3tovec"
 _PLAYLIST_SUB=${_ME%.*}
@@ -213,6 +215,10 @@ do
       _ROOT_DIR="$(__get_option_value "${__arg}" "${__val:-}")"
       shift
       ;;
+    -d|--playlist-directory)
+      _PLAYLIST_DIR="$(__get_option_value "${__arg}" "${__val:-}")"
+      shift
+      ;;
     -p|--playlist-count)
       _PLAYLISTS_COUNT="$(__get_option_value "${__arg}" "${__val:-}")"
       shift
@@ -224,7 +230,7 @@ do
     -l|--lookback)
       _LOOKBACK="$(__get_option_value "${__arg}" "${__val:-}")"
       shift
-      ;; 
+      ;;
     -s|--playlist-length)
       _SONGS="$(__get_option_value "${__arg}" "${__val:-}")"
       shift
@@ -236,11 +242,11 @@ do
     -p|--pickles)
       _PICKLES="$(__get_option_value "${__arg}" "${__val:-}")"
       shift
-      ;;            
+      ;;
     -m|--mp3tovec)
       _MP3TOVEC="$(__get_option_value "${__arg}" "${__val:-}")"
       shift
-      ;;    
+      ;;
     --endopts)
       # Terminate option parsing.
       break
@@ -269,6 +275,7 @@ _print_variables(){
   cat <<HEREDOC
 >> Variables set:
          _ROOT_DIR=${_ROOT_DIR}
+         _PLAYLIST_DIR=${_PLAYLIST_DIR}
          _FILE_EXT=${_FILE_EXT}
          _PLAYLISTS_COUNT=${_PLAYLISTS_COUNT}
          _SONGS=${_SONGS}
@@ -328,7 +335,33 @@ _validate_root_directory(){
   fi    
   # Solve for symlinks
   _ROOT_DIR=$(readlink -f "${_ROOT_DIR}")
-  _debug printf ">> readlink exited with %d\n         _ROOT_DIR=${_ROOT_DIR}\\n" $?
+  _debug printf ">> readlink exited with %d\\n         _ROOT_DIR=${_ROOT_DIR}\\n" $?
+}
+
+# _validate_playlist_directory()
+#
+# Usage:
+#   _validate_playlist_directory
+#
+# Description:
+#  Ensures the --playlist-directory exists and is canonical, or defaults to root.
+#
+_validate_playlist_directory(){
+  if ! [[ -n "${_PLAYLIST_DIR}" ]] ; then
+    _PLAYLIST_DIR=${_ROOT_DIR}
+  fi
+  # Convert the playlist directory to an absolute path if there's a ~ in it.
+  if [ "${_PLAYLIST_DIR:0:1}" == \~ ]; then
+      eval _PLAYLIST_DIR="$(printf '~%q' "${_PLAYLIST_DIR#\~}")"
+      _debug printf ">> Expanded ~ \\n         _PLAYLIST_DIR=${_PLAYLIST_DIR}\\n"
+  fi
+  # Check if the provided playlist directory exists
+  if [ ! -d ${_PLAYLIST_DIR} ]; then
+      _exit_1 printf "[ ERROR ] The --playlist-directory does not appear to exist. Try --debug if you must\\n"
+  fi
+  # Solve for symlinks
+  _PLAYLIST_DIR=$(readlink -f "${_PLAYLIST_DIR}")
+  _debug printf ">> readlink exited with %d\\n         _PLAYLIST_DIR=${_PLAYLIST_DIR}\\n" $?
 }
 
 # _generate_playlists()
@@ -370,10 +403,10 @@ _generate_playlists() {
     __playlist=$(printf "${__playlist}"-"${_PLAYLIST_SUB}"".m3u")
 
     # Prepare your variables for Deej-AI
-    if [[ "${_ROOT_DIR}" != */ ]]; then
-        __dj_playlist="${_ROOT_DIR}/${__playlist}"
+    if [[ "${_PLAYLIST_DIR}" != */ ]]; then
+        __dj_playlist="${_PLAYLIST_DIR}/${__playlist}"
     else
-        __dj_playlist="${_ROOT_DIR}${__playlist}"
+        __dj_playlist="${_PLAYLIST_DIR}${__playlist}"
     fi
     _debug cat <<HEREDOC
 >> At playlists loop 
