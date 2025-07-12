@@ -504,7 +504,7 @@ if __name__ == '__main__':
     mp3tovec = pickle.load(open(dump_directory + '/mp3tovecs/' + mp3tovec_file + '.p', 'rb'))
     print(f'{len(mp3tovec)} MP3s')
     if playlist_outfile == None:
-        app.run(threaded=False, debug=False)
+        app.run(host='0.0.0.0', threaded=False, debug=False)
     else:
         if input_song != None:
             if n_songs == None:
