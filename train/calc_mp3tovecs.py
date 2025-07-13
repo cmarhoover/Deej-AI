@@ -77,6 +77,12 @@ def main():
         default=1000,
         help="Save MP3ToVecs every N MP3s",
     )
+    parser.add_argument(
+        "--mp3s_dir_abs",
+        type=str,
+        default=None,
+        help="Absolute path to the directory of MP3 files",
+    )
     args = parser.parse_args()
 
     model = AudioEncoder()
@@ -95,26 +101,32 @@ def main():
 
     if args.recursive:
         formats = set([".mp3", ".wav", ".m4a", ".flac"])
-        mp3_files = [
+        mp3_files_abs = [
             os.path.join(root, file)
             for root, _, files in os.walk(args.mp3s_dir)
             for file in files
             if file[file.rfind(".") :].lower() in formats
         ]
-        extension = None
-        args.mp3s_dir = ""
+        mp3_files_rel = [
+            os.path.relpath(file, args.mp3s_dir_abs or args.mp3s_dir)
+            for file in mp3_files_abs
+        ]
     else:
-        mp3_files = os.listdir(args.mp3s_dir)
-        extension = -len(".mp3")
+        mp3_files_abs = [
+            os.path.join(args.mp3s_dir, file) for file in os.listdir(args.mp3s_dir)
+        ]
+        mp3_files_rel = os.listdir(args.mp3s_dir)
 
     torch.multiprocessing.set_start_method("spawn")
     with concurrent.futures.ProcessPoolExecutor(
         max_workers=args.max_workers
     ) as executor:
         futures = {
-            executor.submit(encode_file, model, mp3_file, args.mp3s_dir): mp3_file
-            for mp3_file in tqdm(mp3_files, desc="Setting up jobs")
-            if f"{mp3_file[:extension]}" not in mp3tovecs and sleep(1e-4) is None
+            executor.submit(encode_file, model, file_abs, ""): file_rel
+            for file_abs, file_rel in tqdm(
+                zip(mp3_files_abs, mp3_files_rel), desc="Setting up jobs"
+            )
+            if file_rel not in mp3tovecs and sleep(1e-4) is None
         }
         for i, future in enumerate(
             tqdm(
@@ -125,7 +137,7 @@ def main():
         ):
             mp3_file = futures[future]
             try:
-                mp3tovecs[mp3_file[:extension]] = future.result()
+                mp3tovecs[mp3_file] = future.result()
                 if (i + 1) % args.save_every == 0:
                     pickle.dump(mp3tovecs, open(args.mp3tovecs_file, "wb"))
             except KeyboardInterrupt:
