@@ -416,7 +416,7 @@ _generate_playlists() {
 HEREDOC
     
     # Now wrangle that Python thing!
-    python Deej-A.I.py ${_PICKLES} ${_MP3TOVEC} --lookback ${_LOOKBACK} --nsongs ${_SONGS} --noise ${_NOISE} --playlist "${__dj_playlist}" --inputsong "${__random_file}"
+    python Deej-A.I.py ${_PICKLES} ${_MP3TOVEC} --lookback ${_LOOKBACK} --nsongs ${_SONGS} --noise ${_NOISE} --playlist "${__dj_playlist}" --inputsong "${__random_file}" --root-directory-abs "${_ROOT_DIR}"
 
   # End loop for n playlists
   done
