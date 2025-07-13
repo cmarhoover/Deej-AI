@@ -12,11 +12,11 @@ from tqdm import tqdm
 import argparse
 import random
 
-def walkmp3s(folder):
+def walkmp3s(folder, folder_abs):
     for dirpath, dirs, files in os.walk(folder, topdown=False):
         for filename in files:
             if filename.lower().endswith(('.flac', '.mp3', '.m4a')):
-                yield filename, os.path.abspath(os.path.join(dirpath, filename))
+                yield filename, os.path.relpath(os.path.join(dirpath, filename), folder_abs)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -26,8 +26,10 @@ if __name__ == '__main__':
     parser.add_argument('--model', type=str, help='Load spectrogram to Track2Vec model (default: "speccy_model")')
     parser.add_argument('--batchsize', type=int, help='Number of MP3s to process in each batch (default: 100)')
     parser.add_argument('--epsilon', type=float, help='Epsilon distance (default: 0.001)')
+    parser.add_argument('--scan_abs', type=str, help='Absolute path to directory of MP3s and M4As to scan')
     args = parser.parse_args()
     mp3_directory = args.scan
+    mp3_directory_abs = args.scan_abs or args.scan
     dump_directory = args.pickles
     mp3tovec_file = args.mp3tovec
     model_file = args.model
@@ -57,15 +59,15 @@ if __name__ == '__main__':
         slice_time = slice_size * hop_length / sr
         files = []
         done = os.listdir(dump_directory)
-        for filename, full_path in walkmp3s(mp3_directory):
-            pickle_filename = os.path.splitext(full_path)[0].replace('\\', '_').replace('/', '_').replace(':','_') + '.p'
+        for filename, rel_path in walkmp3s(mp3_directory, mp3_directory_abs):
+            pickle_filename = os.path.splitext(rel_path)[0].replace('\\', '_').replace('/', '_').replace(':','_') + '.p'
             if pickle_filename in done:
                 continue
-            files.append((pickle_filename, full_path))
+            files.append((pickle_filename, rel_path, os.path.join(mp3_directory, rel_path)))
         random.shuffle(files)
         try:
             with tqdm(files, unit="file") as t:
-                for pickle_filename, full_path in t:
+                for pickle_filename, rel_path, full_path in t:
                     try:
                         y, sr = librosa.load(full_path, mono=True)
                         if y.shape[0] < slice_size:
@@ -78,7 +80,7 @@ if __name__ == '__main__':
                             if np.max(log_S) - np.min(log_S) != 0:
                                 log_S = (log_S - np.min(log_S)) / (np.max(log_S) - np.min(log_S))
                             x[slice, :, :, 0] = log_S
-                        pickle.dump((full_path, model.predict(x, verbose=0)), open(dump_directory + '/' + pickle_filename, 'wb'))
+                        pickle.dump((rel_path, model.predict(x, verbose=0)), open(dump_directory + '/' + pickle_filename, 'wb'))
                     except KeyboardInterrupt:
                         raise
                     except:
