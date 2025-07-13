@@ -26,6 +26,8 @@ import shutil
 import time
 import argparse
 
+MUSIC_LIBRARY_ROOT = None
+
 default_lookback = 3 # number of previous tracks to take into account
 default_noise = 0    # amount of randomness to throw in the mix
 default_playlist_size = 10
@@ -286,9 +288,13 @@ def get_track_info(filename):
     artwork = pict = None
     artist = track = album = None
     duration = 0
-    if filename[-3:].lower() == 'mp3':
+
+    # Construct absolute path if MUSIC_LIBRARY_ROOT is set
+    abs_filename = os.path.join(MUSIC_LIBRARY_ROOT, filename) if MUSIC_LIBRARY_ROOT and not os.path.isabs(filename) else filename
+
+    if abs_filename[-3:].lower() == 'mp3':
         try:
-            audio = ID3(filename)
+            audio = ID3(abs_filename)
             if audio.get('APIC:') is not None:
                 pict = audio.get('APIC:').data
             if audio.get('APIC:Cover') is not None:
@@ -306,9 +312,9 @@ def get_track_info(filename):
                 album = audio['TALB'].text[0]
         except ID3NoHeaderError:
             pass
-        duration = MP3(filename).info.length
-    elif filename[-3:].lower() == 'm4a':
-        audio = MP4(filename)
+        duration = MP3(abs_filename).info.length
+    elif abs_filename[-3:].lower() == 'm4a':
+        audio = MP4(abs_filename)
         if audio.get("covr") is not None:
             pict = audio.get("covr")[0]
             im = Image.open(BytesIO(pict)).convert('RGB')
@@ -322,10 +328,10 @@ def get_track_info(filename):
         if audio.get('\xa9alb') is not None:
             album = audio.get('\xa9alb')[0]
         duration = audio.info.length
-    elif filename[-4:].lower() == 'flac':
-        audio = FLAC(filename)
+    elif abs_filename[-4:].lower() == 'flac':
+        audio = FLAC(abs_filename)
         if audio.pictures:
-            for pict in pics:
+            for pict in audio.pictures:
                 if pict.type == 3:
                     im = Image.open(BytesIO(pict.data)).convert('RGB')
                     buff = BytesIO()
@@ -349,6 +355,10 @@ def play_track(tracks, durations):
     print(f'{len(tracks)}. {artist} - {track} ({album})')
     df = pd.DataFrame({'tracks': tracks, 'durations': durations + [duration]})
     jsonifed_data = df.to_json()
+
+    # Construct absolute path for audio playback
+    abs_track_path = os.path.join(MUSIC_LIBRARY_ROOT, tracks[-1]) if MUSIC_LIBRARY_ROOT and not os.path.isabs(tracks[-1]) else tracks[-1]
+
     return html.Div(
         [
             html.H1(
@@ -364,7 +374,7 @@ def play_track(tracks, durations):
             ),
             html.Audio(
                 id='audio',
-                src='data:audio/mp3;base64,{}'.format(base64.b64encode(open(tracks[-1], 'rb').read()).decode()),
+                src='data:audio/mp3;base64,{}'.format(base64.b64encode(open(abs_track_path, 'rb').read()).decode()),
                 controls=False,
                 autoPlay=True,
                 style={
@@ -481,6 +491,7 @@ if __name__ == '__main__':
     parser.add_argument("--nsongs", type=int, help="Requires --playlist option\nNumber of songs in the playlist")
     parser.add_argument("--noise", type=int, help="Requires --playlist option\nAmount of noise in the playlist (default 0)")
     parser.add_argument("--lookback", type=int, help="Requires --playlist option\nAmount of lookback in the playlist (default 3)")
+    parser.add_argument("--root-directory-abs", type=str, help="Absolute path to the root of the music library.")
 
     args = parser.parse_args()
     dump_directory = args.pickles
@@ -490,10 +501,14 @@ if __name__ == '__main__':
     batch_size = args.batchsize
     epsilon_distance = args.epsilon
     playlist_outfile = args.playlist
-    input_song = args.inputsong
+    input_song_abs = args.inputsong
     n_songs = args.nsongs
     noise = args.noise
     lookback = args.lookback
+    root_dir_abs = args.root_directory_abs
+
+    if root_dir_abs:
+        MUSIC_LIBRARY_ROOT = root_dir_abs
 
     if model_file == None:
         model_file = 'speccy_model'
@@ -504,9 +519,13 @@ if __name__ == '__main__':
     mp3tovec = pickle.load(open(dump_directory + '/mp3tovecs/' + mp3tovec_file + '.p', 'rb'))
     print(f'{len(mp3tovec)} MP3s')
     if playlist_outfile == None:
-        app.run(host='0.0.0.0', threaded=False, debug=False)
+        app.run(threaded=False, debug=False)
     else:
-        if input_song != None:
+        if input_song_abs != None:
+            input_song_rel = os.path.relpath(input_song_abs, root_dir_abs) if root_dir_abs else input_song_abs
+            if input_song_rel not in mp3tovec:
+                print(f"[ERR] --inputsong '{input_song_rel}' ('{input_song_abs}') not found in the database.")
+                exit(1)
             if n_songs == None:
                 n_songs = default_playlist_size
             if noise == None:
@@ -515,10 +534,14 @@ if __name__ == '__main__':
                 lookback = default_lookback
 
             print("Outfile playlist: {}".format(playlist_outfile))
-            print("Input song selected: {}".format(input_song))
+            print("Input song selected: {}".format(input_song_abs))
             print("Requested {} songs".format(n_songs))
 
-            tracks = make_playlist([input_song], size=n_songs + 1, noise=noise, lookback=lookback)
-            tracks_to_m3u(playlist_outfile, tracks)
+            # Generate playlist using relative paths
+            relative_tracks = make_playlist([input_song_rel], size=n_songs + 1, noise=noise, lookback=lookback)
+            
+            # Convert tracks back to absolute paths for writing to M3U
+            absolute_tracks = [os.path.join(root_dir_abs, t) for t in relative_tracks] if root_dir_abs else relative_tracks
+            tracks_to_m3u(playlist_outfile, absolute_tracks)
         else:
             print("[ERR] Argument --inputsong is required")
