@@ -10,12 +10,13 @@ import re
 
 max_duration = 10 * 60 # avoid adding mixes to mix
 
-def get_track_duration(filename):
+def get_track_duration(filename, root_dir_abs=None):
     duration = 0
-    if filename[-3:].lower() == 'mp3':
-        duration = MP3(filename).info.length
-    elif filename[-3:].lower() == 'm4a':
-        duration = MP4(filename).info.length
+    abs_path = os.path.join(root_dir_abs, filename) if root_dir_abs and not os.path.isabs(filename) else filename
+    if abs_path[-3:].lower() == 'mp3':
+        duration = MP3(abs_path).info.length
+    elif abs_path[-3:].lower() == 'm4a':
+        duration = MP4(abs_path).info.length
     return duration
 
 def most_similar(positive=[], negative=[], topn=5, noise=0):
@@ -65,19 +66,19 @@ def in_playlist(candidate, playlist):
             return True
     return False
 
-def make_playlist(seed_tracks, size=10, lookback=3, noise=0):
+def make_playlist(seed_tracks, size=10, lookback=3, noise=0, root_dir_abs=None):
     max_tries = 100
     playlist = seed_tracks
     while len(playlist) < size:
         similar = most_similar(positive=playlist[-lookback:], topn=max_tries, noise=noise)
         candidates = [candidate[0] for candidate in similar if candidate[0] != playlist[-1]]
         for candidate in candidates:
-            if not in_playlist(candidate, playlist) and get_track_duration(candidate) < max_duration:
+            if not in_playlist(candidate, playlist) and get_track_duration(candidate, root_dir_abs) < max_duration:
                 break
         playlist.append(candidate)
     return playlist
 
-def join_the_dots(tracks, n=5, noise=0): # create a musical journey between given track "waypoints"
+def join_the_dots(tracks, n=5, noise=0, root_dir_abs=None): # create a musical journey between given track "waypoints"
     max_tries = 100
     playlist = []
     end = start = tracks[0]
@@ -89,7 +90,7 @@ def join_the_dots(tracks, n=5, noise=0): # create a musical journey between give
             similar = most_similar_by_vec(positive=[(n-i+1)/n * start_vec + (i+1)/n * end_vec], topn=max_tries, noise=noise)
             candidates = [candidate[0] for candidate in similar if candidate[0] != playlist[-1]]
             for candidate in candidates:
-                if not in_playlist(candidate, playlist) and candidate != end and get_track_duration(candidate) < max_duration:
+                if not in_playlist(candidate, playlist) and candidate != end and get_track_duration(candidate, root_dir_abs) < max_duration:
                     break
             playlist.append(candidate)
         start = end
@@ -105,6 +106,7 @@ if __name__ == '__main__':
     parser.add_argument('n', type=int, help='Number of songs to add between input songs')
     parser.add_argument('--noise', type=float, help='Degree of randomness (0-1)')
     parser.add_argument('--epsilon', type=float, help='Epsilon distance (default: 0.001)')
+    parser.add_argument('--root-directory-abs', type=str, help='Absolute path to the music library')
     args = parser.parse_args()
     mp3tovec_filename = args.mp3tovec
     tracks_filename = args.inputs
@@ -124,7 +126,11 @@ if __name__ == '__main__':
     if tracks_filename is not None:
         with open(tracks_filename, 'rt') as file:
             for track in file:
-                input_tracks.append(track.replace('\n',''))
+                track = track.strip()
+                if args.root_directory_abs:
+                    input_tracks.append(os.path.relpath(track, args.root_directory_abs))
+                else:
+                    input_tracks.append(track)
     else:
         user_input = input('Search keywords: ')
         while True:
@@ -150,14 +156,15 @@ if __name__ == '__main__':
         tracks = [mp3 for mp3 in mp3tovec]
         input_tracks.append(tracks[random.randint(0, len(tracks))])
     if len(input_tracks) > 1:
-        playlist = join_the_dots(input_tracks, n=n, noise=noise)
+        playlist = join_the_dots(input_tracks, n=n, noise=noise, root_dir_abs=args.root_directory_abs)
     else:
-        playlist = make_playlist(input_tracks, size=n, lookback=3, noise=noise)
+        playlist = make_playlist(input_tracks, size=n, lookback=3, noise=noise, root_dir_abs=args.root_directory_abs)
     tracks = []
     for i, track in enumerate(playlist):
         tracks.append('-i')
-        tracks.append(track)
-        total_duration += get_track_duration(track)
+        abs_path = os.path.join(args.root_directory_abs, track) if args.root_directory_abs and not os.path.isabs(track) else track
+        tracks.append(abs_path)
+        total_duration += get_track_duration(track, args.root_directory_abs)
         if n == 0 and i == 0 or n != 0 and i % (n+1) == 0:
             print(f'{i+1}.* {track}')
         else:
