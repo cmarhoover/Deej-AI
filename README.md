@@ -1,3 +1,7 @@
+Edits made to this project to run inside a docker container on aarch64 linux, using relative paths rather than absolute paths throughout the project. -cmarhoover
+
+-----------------
+
 ![](MBIT_logo.png)
 
 # Deej-A.I.
