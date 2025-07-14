@@ -1,4 +1,4 @@
-Edits made to this project to run inside a docker container on aarch64 linux, using relative paths rather than absolute paths throughout the project. --root-directory-abs is a new argument in Deej-A.I..py, MP3toVec.py, and Join_the_dots.py. rand-playlist.sh has been updated for relative paths as well, and includes a new argument --playlist-directory for specifying a location to save generated .m3u file.
+Edits made to this project to run inside a docker container on aarch64 linux, using relative paths rather than absolute paths throughout. --root-directory-abs is a new argument in Deej-A.I..py, MP3toVec.py, and Join_the_dots.py. rand-playlist.sh has been updated for relative paths as well, and includes a new argument --playlist-directory for specifying a location to save generated .m3u file.
 
 -----------------
 
