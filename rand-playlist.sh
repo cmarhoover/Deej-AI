@@ -388,7 +388,7 @@ _generate_playlists() {
   if [ "${#__files[@]}" -eq 0 ]; then
       _exit_1 _err_no_matches
   fi
-  _debug printf ">> #files=${#__files[@]:-} \\n"
+  _debug printf ">> #files=${#__files[@]} \\n"
   set -u
 
   # Start loop for n playlists
