@@ -17,11 +17,14 @@ playlist_path = string.trim(playlist_path_raw)
 
 # 4. Define the 'music' variable using an if/else expression.
 # This structure ensures 'music' is always assigned a value before it's used later.
+
+enable_replaygain_metadata()
+
 music =
   if playlist_path != "" then
     print("Success! Found today's playlist: #{playlist_path}")
     # This value is returned and assigned to 'music' if the file is found.
-    mksafe(crossfade(duration=2.0, playlist(mode="normal", playlist_path)))
+    mksafe(crossfade(duration=2.0, replaygain(playlist(mode="normal", playlist_path))))
   else
     print("Warning: No playlist found for today. Playing silence.")
     # This value is returned and assigned to 'music' if no file is found.
