@@ -3,11 +3,11 @@
 #  _____           _              ____     __    _____ _         _ _     _
 # | __  |___ ___ _| |___ _____   |    \ __|  |  |  _  | |___ _ _| |_|___| |_
 # |    -| .'|   | . | . |     |  |  |  |  |  |  |   __| | .'| | | | |_ -|  _|
-# |__|__|__,|_|_|___|___|_|_|_|  |____/|_____|  |__|  |_|__,|_  |_|_|___|_|
+# |__|__|__,|_|_|___|___|_|_|_|  |____|/|_____|  |__|  |_|__,|_  |_|_|___|_|
 #                                                           |___|
 #
 # Create one or more Deej-AI playlists by randomly selecting a track from a root
-# directory and its subdirectories.
+# directory and its subdirectories, or by specifying a seed track.
 #
 # Usage:
 #   ./rand-playlist.sh [--options] [<arguments>]
@@ -17,7 +17,7 @@
 #   Deej-AI     https://github.com/teticio/Deej-AI
 #
 # Copyleft (c) 2024 alfred_j_kwack
-# version: 1.0.2
+# version: 1.1.0
 
 ###############################################################################
 # Strict Mode
@@ -125,7 +125,7 @@ _print_help() {
                                                           |___|
 
 Create one or more Deej-AI playlists by randomly selecting a track from a root
-directory and its subdirectories.
+directory and its subdirectories, or by specifying a seed track.
 
 Usage:
   ${_ME} [--options] [<arguments>]
@@ -134,24 +134,26 @@ Usage:
 Options:
   -h --help               Display this help information.
   -r --root-directory     Directory to search for tracks.   [ Required ]
+  -t --track              Specify a track directly.         [ Bypasses random selection ]
   -d --playlist-directory Directory to save the playlists.  [ Default = <root_directory> ]
   -p --playlist-count     Number of playlists to create.    [ Default = 1 ]
   -e --file-extension     File extenstion to match for.     [ Default = ".mp3" ]
   -s --playlist-length    Number of tracks in playlist.     [ Default = 200 ]
   -l --lookback           Deej-A.I lookback option.         [ Default = 3 ]
   -n --noise              Deej-A.I noise option.            [ Default = 1 ]
-  -p --pickles            Deej-A.I pickles option.          [ Default = "Pickles" ]
+  --pickles               Deej-A.I pickles option.          [ Default = "Pickles" ]
   -m --mp3tovec           Deej-A.I mp3tovec option.         [ Default = "mp3tovec" ]
 
 Example:
   ${_ME} -r "./some path/to music" -p 10 --file-extension ".flac"
+  ${_ME} -r "./music" -t "./music/my band/my album/track1.mp3"
 
 Output: 
-  The script will create one or more .m3u files at the <root_directory> 
+  The script will create one or more .m3u files at the <playlist_directory> 
   The names of the playlists will follow this format: 
     for a root directory "./some path/to music"
     a random track found at "./some path/to music/my band/my album/track1.mp3"
-    will generate a playlist named "my_band-${_ME%.*}.3mu"
+    will generate a playlist named "<date>-my_band-<script_name>.3mu"
 
 HEREDOC
 }
@@ -168,6 +170,7 @@ _USE_DEBUG=0
 
 # Initialize additional expected option variables.
 _ROOT_DIR=
+_SPECIFIED_TRACK=
 _PLAYLIST_DIR=
 _PLAYLISTS_COUNT=1
 _FILE_EXT=".mp3"
@@ -215,6 +218,10 @@ do
       _ROOT_DIR="$(__get_option_value "${__arg}" "${__val:-}")"
       shift
       ;;
+    -t|--track)
+      _SPECIFIED_TRACK="$(__get_option_value "${__arg}" "${__val:-}")"
+      shift
+      ;;
     -d|--playlist-directory)
       _PLAYLIST_DIR="$(__get_option_value "${__arg}" "${__val:-}")"
       shift
@@ -235,11 +242,11 @@ do
       _SONGS="$(__get_option_value "${__arg}" "${__val:-}")"
       shift
       ;;
-    --n|--noise)
+    -n|--noise)
       _NOISE="$(__get_option_value "${__arg}" "${__val:-}")"
       shift
       ;;
-    -p|--pickles)
+    --pickles)
       _PICKLES="$(__get_option_value "${__arg}" "${__val:-}")"
       shift
       ;;
@@ -275,6 +282,7 @@ _print_variables(){
   cat <<HEREDOC
 >> Variables set:
          _ROOT_DIR=${_ROOT_DIR}
+         _SPECIFIED_TRACK=${_SPECIFIED_TRACK}
          _PLAYLIST_DIR=${_PLAYLIST_DIR}
          _FILE_EXT=${_FILE_EXT}
          _PLAYLISTS_COUNT=${_PLAYLISTS_COUNT}
@@ -330,13 +338,37 @@ _validate_root_directory(){
       _debug printf ">> Expanded ~ \\n         _ROOT_DIR=${_ROOT_DIR}\\n"
   fi
   # Check if the provided root directory exists
-  if [ ! -d ${_ROOT_DIR} ]; then
+  if [ ! -d "${_ROOT_DIR}" ]; then
       _exit_1 printf "[ ERROR ] The --root-directory does not appear to exist. Try --debug if you must\\n"
   fi    
   # Solve for symlinks
   _ROOT_DIR=$(readlink -f "${_ROOT_DIR}")
   _debug printf ">> readlink exited with %d\\n         _ROOT_DIR=${_ROOT_DIR}\\n" $?
 }
+
+# _validate_track_file()
+#
+# Usage:
+#   _validate_track_file
+#
+# Description:
+#  Ensures the --track file exists and is canonical
+#
+_validate_track_file(){
+  # Convert to an absolute path if there's a ~ in it.
+  if [ "${_SPECIFIED_TRACK:0:1}" == \~ ]; then
+      eval _SPECIFIED_TRACK="$(printf '~%q' "${_SPECIFIED_TRACK#\~}")"
+      _debug printf ">> Expanded ~ \\n         _SPECIFIED_TRACK=${_SPECIFIED_TRACK}\\n"
+  fi
+  # Check if the provided file exists
+  if [ ! -f "${_SPECIFIED_TRACK}" ]; then
+      _exit_1 printf "[ ERROR ] The --track file does not appear to exist. Try --debug if you must\\n"
+  fi
+  # Solve for symlinks
+  _SPECIFIED_TRACK=$(readlink -f "${_SPECIFIED_TRACK}")
+  _debug printf ">> readlink exited with %d\\n         _SPECIFIED_TRACK=${_SPECIFIED_TRACK}\\n" $?
+}
+
 
 # _validate_playlist_directory()
 #
@@ -356,7 +388,7 @@ _validate_playlist_directory(){
       _debug printf ">> Expanded ~ \\n         _PLAYLIST_DIR=${_PLAYLIST_DIR}\\n"
   fi
   # Check if the provided playlist directory exists
-  if [ ! -d ${_PLAYLIST_DIR} ]; then
+  if [ ! -d "${_PLAYLIST_DIR}" ]; then
       _exit_1 printf "[ ERROR ] The --playlist-directory does not appear to exist. Try --debug if you must\\n"
   fi
   # Solve for symlinks
@@ -374,32 +406,38 @@ _validate_playlist_directory(){
 #  
 _generate_playlists() {
   # Declare the variables you will use
-  local __random_file
+  local __seed_track
   local __relative_file
   local __playlist
 
-  # Populate the files array
-  while IFS= read -r -d '' file; do
-      __files+=("$file")
-  done < <(find ${_ROOT_DIR} -type f -name "*${_FILE_EXT}" -print0)
+  # Populate the files array only if a specific track is not provided
+  if ! [[ -n "${_SPECIFIED_TRACK}" ]]; then
+    while IFS= read -r -d '' file; do
+        __files+=("$file")
+    done < <(find "${_ROOT_DIR}" -type f -name "*${_FILE_EXT}" -print0)
 
-  # Check if any files with the given extension were found
-  set +u
-  if [ "${#__files[@]}" -eq 0 ]; then
-      _exit_1 _err_no_matches
+    # Check if any files with the given extension were found
+    set +u
+    if [ "${#__files[@]}" -eq 0 ]; then
+        _exit_1 _err_no_matches
+    fi
+    _debug printf ">> #files=${#__files[@]} \\n"
+    set -u
   fi
-  _debug printf ">> #files=${#__files[@]} \\n"
-  set -u
 
   # Start loop for n playlists
   for ((__i = 0 ; __i < ${_PLAYLISTS_COUNT} ; __i++)); do
 
-    # Randomly choose one file from the array
-    __random_file="${__files[RANDOM % ${#__files[@]}]}"
+    # Set the seed track, either from the specified track or by random selection
+    if [[ -n "${_SPECIFIED_TRACK}" ]]; then
+      __seed_track="${_SPECIFIED_TRACK}"
+    else
+      __seed_track="${__files[RANDOM % ${#__files[@]}]}"
+    fi
 
     # Set the playlist filename
-    __relative_file=$(printf "${__random_file}" | sed "s|^${_ROOT_DIR}/||")
-	__playlist=$(printf "%s-%s-%s.m3u" "$(date +%F)" "$(printf "${__relative_file}" | cut -d'/' -f1 | sed 's/ /_/g')" "$(basename "${__random_file}" .mp3)")
+    __relative_file=$(printf "%s" "${__seed_track}" | sed "s|^${_ROOT_DIR}/||")
+	__playlist=$(printf "%s-%s-%s.m3u" "$(date +%F)" "$(printf "%s" "${__relative_file}" | cut -d'/' -f1 | sed 's/ /_/g')" "$(basename "${__seed_track}" .mp3)")
 
     # Prepare your variables for Deej-AI
     if [[ "${_PLAYLIST_DIR}" != */ ]]; then
@@ -410,13 +448,13 @@ _generate_playlists() {
     _debug cat <<HEREDOC
 >> At playlists loop 
          __i="${__i}"
-         __random_file="${__random_file}"
+         __seed_track="${__seed_track}"
          __playlist="${__playlist}"
          __dj_playlist="${__dj_playlist}"
 HEREDOC
     
     # Now wrangle that Python thing!
-    python Deej-A.I.py ${_PICKLES} ${_MP3TOVEC} --lookback ${_LOOKBACK} --nsongs ${_SONGS} --noise ${_NOISE} --playlist "${__dj_playlist}" --inputsong "${__random_file}" --root-directory-abs "${_ROOT_DIR}"
+    python Deej-A.I.py ${_PICKLES} ${_MP3TOVEC} --lookback ${_LOOKBACK} --nsongs ${_SONGS} --noise ${_NOISE} --playlist "${__dj_playlist}" --inputsong "${__seed_track}" --root-directory-abs "${_ROOT_DIR}"
 
   # End loop for n playlists
   done
@@ -468,6 +506,21 @@ _main() {
     else 
       _validate_root_directory
     fi
+
+    # Validate the --track parameter if it's present
+    if [[ -n "${_SPECIFIED_TRACK}" ]] ; then
+        _validate_track_file
+        if [[ "${_SPECIFIED_TRACK}" != "${_ROOT_DIR}"* ]]; then
+            _exit_1 printf "[ ERROR ] The specified --track must be inside the --root-directory.\\n"
+        fi
+        if (( _PLAYLISTS_COUNT > 1 )); then
+            _warn printf "[ WARN  ] --track is specified, so --playlist-count will be ignored. Only one playlist will be created.\\n"
+            _PLAYLISTS_COUNT=1
+        fi
+    fi
+
+    # Set and validate the playlist directory
+    _validate_playlist_directory
 
     # Now we can proceed.
     _generate_playlists "$@"
