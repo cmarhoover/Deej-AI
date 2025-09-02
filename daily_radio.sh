@@ -9,11 +9,11 @@ echo "🎶 Starting the daily playlist creation process..."
 # --- Step 1: Determine Today's Genre ---
 genres=(
   "Ambient"             # Sunday
-  "Pop"                 # Monday
-  "Rock"                # Tuesday
-  "Jazz"                # Wednesday
-  "Blues"               # Thursday
-  "Electronic"          # Friday
+  "Electronic"          # Monday
+  "(Rock|Pop)"          # Tuesday
+  "(Jazz|Blues)"        # Wednesday
+  "(Folk|Indie)"        # Thursday
+  "Classical"           # Friday
   "Hip-Hop"             # Saturday
 )
 
@@ -25,7 +25,7 @@ echo "Today is $(date +%A). Selected genre: '$todays_genre'"
 
 # --- Step 2: Select a Random Track for the Genre ---
 echo "🔎 Selecting a random track..."
-track_path=$(docker exec beets beet random -pe genre:"$todays_genre")
+track_path=$(docker exec beets beet random -pe genre::"$todays_genre")
 
 # --- Step 3: Validate the Track Path ---
 # Check if the select_track script failed to return a path.
