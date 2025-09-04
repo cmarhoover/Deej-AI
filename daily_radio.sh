@@ -8,13 +8,13 @@ echo "🎶 Starting the daily playlist creation process..."
 
 # --- Step 1: Determine Today's Genre ---
 genres=(
-  "Ambient"             # Sunday
-  "Electronic"          # Monday
-  "(Rock|Pop)"          # Tuesday
-  "(Jazz|Blues)"        # Wednesday
-  "(Folk|Indie)"        # Thursday
-  "Classical"           # Friday
-  "Hip-Hop"             # Saturday
+  "(Ambient|Chill)"  # Sunday
+  "Electro"          # Monday
+  "(Rock|Metal)"     # Tuesday
+  "(Jazz|Blues)"     # Wednesday
+  "(Folk|Indie)"     # Thursday
+  "Classical"        # Friday
+  "(Hip-Hop|Funk)"   # Saturday
 )
 
 # Get the day's index (0-6) and select the genre.
